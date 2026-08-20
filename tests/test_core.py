@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import actions  # noqa: E402
 import ai_chat  # noqa: E402
+import banner  # noqa: E402
 import config as config_mod  # noqa: E402
 import leave_chat  # noqa: E402
 from fake_client import FakeClient  # noqa: E402
@@ -382,6 +383,39 @@ class UiTests(unittest.TestCase):
         widths = {_visible_len(l) for l in lines}
         self.assertEqual(widths, {14}, f"all box rows must share one width, got {widths}")
         self.assertTrue(any("…" in l for l in lines), "long lines must be clipped")
+
+
+class BannerTests(unittest.TestCase):
+    def test_center_pads_left_only(self):
+        from banner import _center
+
+        self.assertEqual(_center("ab", 8), "   ab")
+        self.assertEqual(_center("abcdef", 4), "abcdef")
+        self.assertEqual(_center("", 6), "   ")
+
+    def test_lines_fit_width_and_have_density(self):
+        for width in (80, 120):
+            lines = banner._lines_for(width)
+            self.assertTrue(lines, "banner must always produce lines")
+            self.assertTrue(all(len(l) <= width for l in lines), f"lines must fit {width}")
+            if banner.HAS_DEPS:
+                self.assertTrue(
+                    any(c in banner.DENSE_CHARS for l in lines for c in l),
+                    "dense glyphs must exist for the accent shimmer",
+                )
+
+    def test_trailing_blank_lines_trimmed(self):
+        if not banner.HAS_DEPS:
+            self.skipTest("pyfiglet not installed")
+        for text, candidates in (
+            (banner.TOP_TEXT, banner.TOP_FONT_CANDIDATES),
+            (banner.BOTTOM_TEXT, banner.BOTTOM_FONT_CANDIDATES),
+        ):
+            lines = banner._render_with_candidates(text, candidates)
+            self.assertTrue(lines)
+            if lines is None:
+                self.fail("font candidates must render")
+            self.assertTrue(lines[-1].strip(), "last line must not be blank")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 """
 Splash banner for IG Multi Tool.
 
-"IG" rendered in a heavy geometric figlet font, "MULTI TOOL" in a
-curvy S-style font, stacked. White text with red accent on the dense
-glyphs, animated line-by-line reveal + glyph shimmer.
+"IG" and "MULTI TOOL" rendered in a heavy block figlet font (banner3),
+stacked and centered. White text with red accent on the dense glyphs,
+animated line-by-line reveal + glyph shimmer.
 
 Cross-platform: falls back to a slim banner when pyfiglet is missing
 or the terminal is too narrow. Uses ui.py helpers so ANSI/UTF-8 are
@@ -29,8 +29,8 @@ TOP_TEXT = "IG"
 BOTTOM_TEXT = "MULTI TOOL"
 SUBTITLE = "made by soics"
 
-TOP_FONT_CANDIDATES = ["doom", "colossal", "computer", "univers"]
-BOTTOM_FONT_CANDIDATES = ["soft", "3-d", "cyberlarge", "isometric1"]
+TOP_FONT_CANDIDATES = ["banner3", "doom", "colossal", "univers"]
+BOTTOM_FONT_CANDIDATES = ["banner3", "3-d", "cyberlarge", "soft"]
 
 LIGHT_CHARS = set(":.'`,-_")
 DENSE_CHARS = set("#%@&$")
@@ -59,7 +59,10 @@ def _render_with_candidates(text: str, candidates: list[str]):
         try:
             fig = pyfiglet.Figlet(font=name)  # type: ignore[name-defined]
             rendered = fig.renderText(text).rstrip("\n")
-            return rendered.split("\n")
+            lines = [l.rstrip() for l in rendered.split("\n")]
+            while lines and not lines[-1].strip():
+                lines.pop()
+            return lines
         except Exception:
             continue
     return None
@@ -98,10 +101,16 @@ def _slim_lines(width: int) -> list[str] | None:
     return [f"== {TOP_TEXT} {BOTTOM_TEXT} =="]
 
 
-def _subtitle() -> str:
+def _subtitle(width: int | None = None) -> str:
+    text = SUBTITLE if width is None else _center(SUBTITLE, width)
     if ui.HAS_COLOR:
-        return f"{RED}{BRIGHT}{SUBTITLE}{RESET}"
-    return SUBTITLE
+        return f"{RED}{BRIGHT}{text}{RESET}"
+    return text
+
+
+def _center(line: str, width: int) -> str:
+    pad = max((width - len(line)) // 2, 0)
+    return " " * pad + line
 
 
 def _lines_for(width: int):
@@ -114,8 +123,8 @@ def render() -> str:
 
     width = shutil.get_terminal_size(fallback=(80, 24)).columns
     lines = _lines_for(width)
-    body = "\n".join(_shade_line(l) for l in lines)
-    return f"{body}\n{_subtitle()}\n"
+    body = "\n".join(_shade_line(_center(l, width)) for l in lines)
+    return f"{body}\n{_subtitle(width)}\n"
 
 
 def print_animated(speed: float = 0.012) -> None:
@@ -127,16 +136,17 @@ def print_animated(speed: float = 0.012) -> None:
 
     # line-by-line reveal
     for line in lines:
-        print(_shade_line(line))
+        print(_shade_line(_center(line, width)))
         sys.stdout.flush()
         time.sleep(speed)
 
     # shimmer: recolor dense glyphs through an accent cycle
     positions = []
     for y, line in enumerate(lines):
+        pad = max((width - len(line)) // 2, 0)
         for x, ch in enumerate(line):
             if ch in DENSE_CHARS:
-                positions.append((y, x))
+                positions.append((y, x + pad))
     if positions and ui.supports_cursor():
         for i in range(len(ACCENT_CYCLE) * 2):
             for y, x in positions:
@@ -153,7 +163,7 @@ def print_animated(speed: float = 0.012) -> None:
     else:
         time.sleep(0.2)
 
-    print(f"{_subtitle()}\n")
+    print(f"{_subtitle(width)}\n")
 
 
 if __name__ == "__main__":
