@@ -2,8 +2,9 @@
 """Instagram Multi-Tool - CLI entry point.
 
 Usage:
-  python main.py              interactive menu
-  python main.py --chat       jump straight to AI chat
+  python main.py               interactive menu
+  python main.py --chat        jump straight to AI chat
+  python main.py --preview     browse the UI with fake data (no login)
 """
 
 import sys
@@ -20,6 +21,12 @@ except ImportError:
 
 def client_factory():
     return instagrapi.Client()  # pyright: ignore[reportOptionalMemberAccess]
+
+
+def fake_client_factory():
+    from fake_client import FakeClient
+
+    return FakeClient()
 
 
 def show_banner():
@@ -44,22 +51,30 @@ def ensure_deps():
 
 def main():
     show_banner()
+    args = sys.argv[1:]
+    preview = "--preview" in args
+    jump_chat = "--chat" in args
+
     cfg = config_mod.load_config()
-    if config_mod.first_run():
+    if preview:
+        print(f"{DIM}preview mode: fake data, no login, fast pacing.{RESET}")
+        cfg.setdefault("pacing", {}).update(
+            {"action_delay_min": 0.1, "action_delay_max": 0.2, "batch_pause_every": 0, "batch_pause_seconds": 0}
+        )
+        client = fake_client_factory()
+    elif config_mod.first_run():
         print(
             f"{DIM}first run: copy config.example.json to config.json "
-            f"and fill in your username/password/RESET"
+            f"and fill in your username/password{RESET}"
         )
-
-    client = None
-    if ensure_deps():
-        client = login(client_factory, cfg)
+        client = None
+    else:
+        client = login(client_factory, cfg) if ensure_deps() else None
 
     if client is None:
         print(f"{ERR}no client - cannot continue.{RESET}")
         sys.exit(1)
 
-    jump_chat = len(sys.argv) > 1 and sys.argv[1] == "--chat"
     try:
         while True:
             if jump_chat:

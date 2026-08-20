@@ -54,7 +54,12 @@ cp config.example.json config.json   # then fill in your details
 ```bash
 python main.py          # interactive menu
 python main.py --chat   # jump straight into AI chat
+python main.py --preview  # browse the whole UI with fake data, no login
 ```
+
+`--preview` runs every tool against a built-in fake client (sample
+accounts, threads, groups) with fast pacing - perfect for seeing the
+layout and flow without touching a real account.
 
 ## Roadmap
 
