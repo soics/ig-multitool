@@ -32,7 +32,8 @@ class FakeThread:
         return f"FakeThread({self.thread_id}, users={len(self.users)})"
 
     def __str__(self):
-        return f"latest message in thread {self.thread_id}"
+        names = ", ".join(u.username for u in self.users[:2])
+        return f"@{names}: \"hey, what's up?\""
 
 
 _NAMES = [

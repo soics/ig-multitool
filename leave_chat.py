@@ -2,9 +2,11 @@
 
 Lists your group chats (threads with 2+ other users), lets you pick
 one or several, and leaves them. Progress tracked in a done-file.
+
+Cross-platform: paths resolve relative to the project dir, not CWD.
 """
 
-from colorama import Fore
+from pathlib import Path
 
 from actions import (
     AbortedError,
@@ -19,8 +21,11 @@ from actions import (
     sleep_between_actions,
     Config,
 )
+from ui import GREEN, header, prompt, status
 
-DONE = Fore.GREEN
+BASE_DIR = Path(__file__).resolve().parent
+
+DONE = GREEN
 
 
 def _list_groups(client):
@@ -43,21 +48,22 @@ def _group_label(thread) -> str:
 
 
 def run(client, cfg: Config) -> None:
+    header("leave group chat", "exit one or several group threads")
     groups = _list_groups(client)
     if not groups:
         print(f"{DIM}no group chats found.{RESET}")
         return
 
-    print(f"found {len(groups)} group chats:")
+    print(f"  found {len(groups)} group chats:")
     for idx, thread in enumerate(groups, 1):
-        print(f"  {idx}) {_group_label(thread)}")
+        print(f"    {idx}) {_group_label(thread)}")
 
-    print("\nleave mode:")
-    print("  1) one group (pick by number)")
-    print("  2) multiple groups (numbers, comma separated)")
-    choice = input(f"{WARN}choose:{RESET} ").strip()
+    print("\n  leave mode:")
+    print("    1) one group (pick by number)")
+    print("    2) multiple groups (numbers, comma separated)")
+    choice = prompt("choose", "1").strip()
     if choice == "2":
-        raw = input(f"{WARN}numbers:{RESET} ").strip()
+        raw = prompt("numbers")
         try:
             indices = [int(x) for x in raw.replace(",", " ").split()]
         except ValueError:
@@ -65,7 +71,7 @@ def run(client, cfg: Config) -> None:
             return
     else:
         try:
-            n = int(input(f"{WARN}group number:{RESET} ").strip())
+            n = int(prompt("group number").strip())
         except ValueError:
             print(f"{ERR}invalid number.{RESET}")
             return
@@ -75,12 +81,12 @@ def run(client, cfg: Config) -> None:
     if not targets:
         print(f"{ERR}no valid groups selected.{RESET}")
         return
-    print(f"will leave {len(targets)} group chat(s)")
+    print(f"  will leave {len(targets)} group chat(s)")
     if not confirm("proceed?"):
-        print("cancelled.")
+        print("  cancelled.")
         return
 
-    done_file = "leave-chat-done.txt"
+    done_file = str(BASE_DIR / "leave-chat-done.txt")
     done = read_done_file(done_file)
     total = len(targets)
     done_count = 0
@@ -102,4 +108,4 @@ def run(client, cfg: Config) -> None:
         print(f"\n{WARN}interrupted - {done_count}/{total} done (resume-safe).{RESET}")
     except Exception as exc:  # noqa: BLE001
         print(f"{ERR}error: {exc}{RESET}")
-    print(f"{DIM}finished: {done_count} left, {total - done_count} remaining.{RESET}")
+    status(done_count == total, f"{done_count}/{total} left, resume file at {done_file}")

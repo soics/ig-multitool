@@ -1,11 +1,13 @@
 """Remove followers tool.
 
-Removes followers from your account (instagrapi's follower removal -
+Removes followers from your account (instagrapi follower removal -
 unfollow-by-request style, not blocking). Amount / all / non-mutuals.
 Progress tracked in a done-file for safe resume.
+
+Cross-platform: paths resolve relative to the project dir, not CWD.
 """
 
-from colorama import Fore
+from pathlib import Path
 
 from actions import (
     AbortedError,
@@ -22,24 +24,28 @@ from actions import (
     sleep_between_actions,
     Config,
 )
+from ui import GREEN, header, prompt, status
+
+BASE_DIR = Path(__file__).resolve().parent
 
 MODE_AMOUNT = "amount"
 MODE_ALL = "all"
 MODE_NON_MUTUAL = "non-mutuals"
 
-DONE = Fore.GREEN
+DONE = GREEN
 
 
 def _choose_mode():
-    print("\nremove followers mode:")
-    print(f"  1) {MODE_AMOUNT}       - remove N followers")
-    print(f"  2) {MODE_ALL}         - remove everyone following you")
-    print(f"  3) {MODE_NON_MUTUAL}  - remove people you don't follow back")
-    choice = input(f"{WARN}choose:{RESET} ").strip()
+    print("\n  remove followers mode:")
+    print(f"    1) {MODE_AMOUNT}       - remove N followers")
+    print(f"    2) {MODE_ALL}         - remove everyone following you")
+    print(f"    3) {MODE_NON_MUTUAL}  - remove people you don't follow back")
+    choice = prompt("choose", "1").strip()
     return {"1": MODE_AMOUNT, "2": MODE_ALL, "3": MODE_NON_MUTUAL}.get(choice, MODE_AMOUNT)
 
 
 def run(client, cfg: Config) -> None:
+    header("remove followers", "prune who follows you")
     mode = _choose_mode()
     amount = 0
     if mode == MODE_AMOUNT:
@@ -60,12 +66,12 @@ def run(client, cfg: Config) -> None:
         print(f"{DIM}no followers to remove.{RESET}")
         return
 
-    print(f"will remove {human_count(len(targets))}")
+    print(f"  will remove {human_count(len(targets))}")
     if not confirm("proceed?"):
-        print("cancelled.")
+        print("  cancelled.")
         return
 
-    done_file = "remove-followers-done.txt"
+    done_file = str(BASE_DIR / "remove-followers-done.txt")
     done = read_done_file(done_file)
     total = len(targets)
     done_count = 0
@@ -87,4 +93,4 @@ def run(client, cfg: Config) -> None:
         print(f"\n{WARN}interrupted - {done_count}/{total} done (resume-safe).{RESET}")
     except Exception as exc:  # noqa: BLE001
         print(f"{ERR}error: {exc}{RESET}")
-    print(f"{DIM}finished: {done_count} removed, {total - done_count} remaining.{RESET}")
+    status(done_count == total, f"{done_count}/{total} removed, resume file at {done_file}")

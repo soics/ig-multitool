@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Instagram Multi-Tool - CLI entry point.
+"""IG Multi Tool - CLI entry point.
+
+Cross-platform (Linux / macOS / Windows).
 
 Usage:
   python main.py               interactive menu
@@ -11,16 +13,21 @@ import sys
 
 import banner
 import config as config_mod
-from actions import DIM, ERR, RESET, WARN, login
+import ui
+from ui import DIM, RED, RESET, YELLOW
 
 try:
-    import instagrapi
+    import instagrapi  # type: ignore[import-not-found]
+
+    _has_instagrapi = True
 except ImportError:
-    instagrapi = None
+    _has_instagrapi = False
+
+WARN = YELLOW
 
 
 def client_factory():
-    return instagrapi.Client()  # pyright: ignore[reportOptionalMemberAccess]
+    return instagrapi.Client()  # type: ignore[attr-defined]
 
 
 def fake_client_factory():
@@ -30,27 +37,33 @@ def fake_client_factory():
 
 
 def show_banner():
-    print(banner.render())
+    banner.print_animated()
 
 
-def menu() -> str:
-    print("\n  [1] AI chat")
-    print("  [2] Mass unfollow")
-    print("  [3] Remove followers")
-    print("  [4] Leave group chat")
-    print("  [5] Quit")
-    return input(f"{WARN}choose:{RESET} ").strip()
-
-
-def ensure_deps():
-    if instagrapi is None:
-        print(f"{ERR}instagrapi not installed. Run: pip install -r requirements.txt{RESET}")
+def ensure_deps() -> bool:
+    if not _has_instagrapi:
+        print(f"{RED}instagrapi not installed. Run: pip install -r requirements.txt{RESET}")
         return False
     return True
 
 
+def main_menu() -> str:
+    return ui.menu(
+        "IG MULTI TOOL",
+        [
+            ("1", "AI chat          - auto-reply to DMs (whitelist control)"),
+            ("2", "Mass unfollow    - clean up your following list"),
+            ("3", "Remove followers - prune who follows you"),
+            ("4", "Leave group chat - exit one or several group threads"),
+        ],
+        prompt="select",
+    )
+
+
 def main():
+    ui.ensure_utf8()
     show_banner()
+
     args = sys.argv[1:]
     preview = "--preview" in args
     jump_chat = "--chat" in args
@@ -69,20 +82,26 @@ def main():
         )
         client = None
     else:
+        from actions import login
+
         client = login(client_factory, cfg) if ensure_deps() else None
 
     if client is None:
-        print(f"{ERR}no client - cannot continue.{RESET}")
+        print(f"{RED}no client - cannot continue.{RESET}")
         sys.exit(1)
 
+    jump_chat_first = jump_chat
     try:
         while True:
-            if jump_chat:
+            if jump_chat_first:
                 choice = "1"
-                jump_chat = False
+                jump_chat_first = False
             else:
-                choice = menu()
-            if choice == "1":
+                choice = main_menu()
+            if choice == "":
+                print("bye.")
+                break
+            elif choice == "1":
                 import ai_chat
 
                 ai_chat.run(client, cfg)
@@ -98,13 +117,10 @@ def main():
                 import leave_chat
 
                 leave_chat.run(client, cfg)
-            elif choice == "5":
-                print("bye.")
-                break
             else:
-                print(f"{ERR}unknown option{RESET}")
+                print(f"{RED}unknown option: {choice}{RESET}")
     except KeyboardInterrupt:
-        print(f"\n{WARN}interrupted.{RESET}")
+        print(f"\n{YELLOW}interrupted.{RESET}")
 
 
 if __name__ == "__main__":

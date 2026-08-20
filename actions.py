@@ -7,9 +7,8 @@ prints how far the run got.
 """
 
 import random
-import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from colorama import Fore, Style

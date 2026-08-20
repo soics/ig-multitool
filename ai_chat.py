@@ -10,14 +10,11 @@ import json
 import time
 import urllib.request
 
-from colorama import Fore, Style
-
-from actions import RESET, WARN, confirm, printable, Config  # pyright: ignore[reportImplicitRelativeImport]
+from actions import RESET, printable, Config
+from ui import CYAN, DIM, GREEN, RED, box, header, prompt
 
 WHITELISTED = "whitelisted"
 EVERYONE = "everyone"
-
-DIM = Style.DIM
 
 
 def _get_recent_messages(client, limit: int = 10):
@@ -67,28 +64,34 @@ def ai_reply(cfg: Config, prompt: str) -> str | None:
             data = json.loads(resp.read())
         return data["choices"][0]["message"]["content"]
     except Exception as exc:  # noqa: BLE001
-        print(f"{Fore.RED}AI request failed: {exc}{RESET}")
+        print(f"{RED}AI request failed: {exc}{RESET}")
         return None
 
 
 def _whitelist_menu(cfg: Config) -> None:
     while True:
         wl = cfg.get("whitelist", [])
-        print(f"\n{DIM}whitelist ({len(wl)}): {', '.join(wl) or 'empty'}{RESET}")
-        print("  1) add user")
-        print("  2) remove user")
-        print("  3) back")
-        choice = input(f"{WARN}choose:{RESET} ").strip()
+        box(
+            "whitelist",
+            [
+                f"{len(wl)} user(s): {', '.join(wl) or 'empty'}",
+                "",
+                f"{CYAN}1{RESET}  add user",
+                f"{CYAN}2{RESET}  remove user",
+                f"{CYAN}3{RESET}  back",
+            ],
+        )
+        choice = prompt("choose", "3").strip()
         if choice == "1":
-            name = input("username: ").strip().lstrip("@")
+            name = prompt("username").lstrip("@")
             if name and name not in wl:
                 cfg.setdefault("whitelist", []).append(name)
-                print(f"{Fore.GREEN}added {name}{RESET}")
+                print(f"  {GREEN}added {name}{RESET}")
         elif choice == "2":
-            name = input("username: ").strip().lstrip("@")
+            name = prompt("username").lstrip("@")
             if name in wl:
                 wl.remove(name)
-                print(f"{Fore.GREEN}removed {name}{RESET}")
+                print(f"  {GREEN}removed {name}{RESET}")
         elif choice == "3":
             break
 
@@ -123,17 +126,22 @@ def chat_loop(client, cfg: Config) -> None:
                     reply = f"hey @{username}, I'll get back to you shortly."
                 print(f"{DIM}-> {username}: {reply[:120]}{RESET}")
             except Exception as exc:  # noqa: BLE001
-                print(f"{Fore.RED}skip thread: {exc}{RESET}")
+                print(f"{RED}skip thread: {exc}{RESET}")
         time.sleep(20)
 
 
 def run(client, cfg: Config) -> None:
-    print("AI chat with whitelist control")
+    header("ai chat", "auto-reply to DMs with whitelist control")
     while True:
-        print("\n  1) chat (reply to DMs automatically)")
-        print("  2) whitelist management")
-        print("  3) back")
-        choice = input(f"{WARN}choose:{RESET} ").strip()
+        box(
+            "ai chat",
+            [
+                f"{CYAN}1{RESET}  chat (reply to DMs automatically)",
+                f"{CYAN}2{RESET}  whitelist management",
+                f"{CYAN}3{RESET}  back",
+            ],
+        )
+        choice = prompt("choose", "3").strip()
         if choice == "1":
             chat_loop(client, cfg)
         elif choice == "2":

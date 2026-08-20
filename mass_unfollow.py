@@ -4,9 +4,11 @@ Unfollows accounts you follow, optionally skipping mutuals, optionally
 restricted to a selected group (list of usernames) or a plain count.
 Progress is tracked in a done-file so an interrupted run can be resumed
 without re-touching already-processed accounts.
+
+Cross-platform: paths resolve relative to the project dir, not CWD.
 """
 
-from colorama import Fore, Style
+from pathlib import Path
 
 from actions import (
     AbortedError,
@@ -17,38 +19,41 @@ from actions import (
     append_done,
     confirm,
     human_count,
-    login,
     maybe_batch_pause,
     pick_number,
     read_done_file,
     sleep_between_actions,
     Config,
 )
+from ui import GREEN, header, prompt, status
+
+BASE_DIR = Path(__file__).resolve().parent
 
 MODE_ALL = "all"
 MODE_NON_MUTUAL = "non-mutuals"
 MODE_SELECTED = "selected"
 MODE_COUNT = "count"
 
-DONE = Fore.GREEN
+DONE = GREEN
 
 
 def _choose_mode():
-    print("\nunfollow mode:")
-    print(f"  1) {MODE_ALL}          - everyone you follow")
-    print(f"  2) {MODE_NON_MUTUAL}  - skip people who follow you back")
-    print(f"  3) {MODE_SELECTED}     - a specific list (comma separated usernames)")
-    print(f"  4) {MODE_COUNT}        - just N accounts, newest first")
-    choice = input(f"{WARN}choose:{RESET} ").strip()
+    print("\n  unfollow mode:")
+    print(f"    1) {MODE_ALL}          - everyone you follow")
+    print(f"    2) {MODE_NON_MUTUAL}  - skip people who follow you back")
+    print(f"    3) {MODE_SELECTED}     - a specific list (comma separated usernames)")
+    print(f"    4) {MODE_COUNT}        - just N accounts, newest first")
+    choice = prompt("choose", "1").strip()
     return {"1": MODE_ALL, "2": MODE_NON_MUTUAL, "3": MODE_SELECTED, "4": MODE_COUNT}.get(choice, MODE_ALL)
 
 
 def _selected_list():
-    raw = input(f"{WARN}usernames (comma separated):{RESET} ").strip()
+    raw = prompt("usernames (comma separated)")
     return [u.strip().lstrip("@") for u in raw.split(",") if u.strip()]
 
 
 def run(client, cfg: Config) -> None:
+    header("mass unfollow", "clean up your following list")
     mode = _choose_mode()
     selected = _selected_list() if mode == MODE_SELECTED else None
     count = 0
@@ -76,12 +81,12 @@ def run(client, cfg: Config) -> None:
         print(f"{DIM}nothing to unfollow.{RESET}")
         return
 
-    print(f"will unfollow {human_count(len(targets))}")
+    print(f"  will unfollow {human_count(len(targets))}")
     if not confirm("proceed?"):
-        print("cancelled.")
+        print("  cancelled.")
         return
 
-    done_file = "unfollow-done.txt"
+    done_file = str(BASE_DIR / "unfollow-done.txt")
     done = read_done_file(done_file)
     progress_total = len(targets)
     done_count = 0
@@ -103,4 +108,4 @@ def run(client, cfg: Config) -> None:
         print(f"\n{WARN}interrupted - {done_count}/{progress_total} done (resume-safe).{RESET}")
     except Exception as exc:  # noqa: BLE001
         print(f"{ERR}error: {exc}{RESET}")
-    print(f"{DIM}finished: {done_count} unfollowed, {progress_total - done_count} remaining.{RESET}")
+    status(done_count == progress_total, f"{done_count}/{progress_total} unfollowed, resume file at {done_file}")
