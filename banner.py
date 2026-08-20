@@ -85,7 +85,13 @@ def _banner_lines(width: int) -> list[str] | None:
         return None
     if max(len(l) for l in all_lines) > width:
         return None
+    if max(len(l) for l in all_lines) * 2 + 4 <= width:
+        all_lines = _double_width(all_lines)
     return all_lines
+
+
+def _double_width(lines: list[str]) -> list[str]:
+    return ["".join(ch * 2 for ch in line) for line in lines]
 
 
 def _slim_lines(width: int) -> list[str] | None:
@@ -93,8 +99,10 @@ def _slim_lines(width: int) -> list[str] | None:
         try:
             fig = pyfiglet.Figlet(font="slant")  # type: ignore[name-defined]
             rendered = fig.renderText(f"{TOP_TEXT} {BOTTOM_TEXT}").rstrip("\n")
-            lines = rendered.split("\n")
+            lines = [l.rstrip() for l in rendered.split("\n")]
             if max(len(l) for l in lines) <= width:
+                if max(len(l) for l in lines) * 2 + 4 <= width:
+                    lines = _double_width(lines)
                 return lines
         except Exception:
             pass
@@ -127,6 +135,16 @@ def render() -> str:
     return f"{body}\n{_subtitle(width)}\n"
 
 
+def _shimmer_positions(lines: list[str], width: int) -> list[tuple[int, int, int]]:
+    positions = []
+    for y, line in enumerate(lines):
+        pad = max((width - len(line)) // 2, 0)
+        for x, ch in enumerate(line):
+            if ch in DENSE_CHARS:
+                positions.append((y, x, x + pad))
+    return positions
+
+
 def print_animated(speed: float = 0.012) -> None:
     """Type the banner line by line, then shimmer accent glyphs."""
     import shutil
@@ -141,18 +159,13 @@ def print_animated(speed: float = 0.012) -> None:
         time.sleep(speed)
 
     # shimmer: recolor dense glyphs through an accent cycle
-    positions = []
-    for y, line in enumerate(lines):
-        pad = max((width - len(line)) // 2, 0)
-        for x, ch in enumerate(line):
-            if ch in DENSE_CHARS:
-                positions.append((y, x + pad))
+    positions = _shimmer_positions(lines, width)
     if positions and ui.supports_cursor():
         for i in range(len(ACCENT_CYCLE) * 2):
-            for y, x in positions:
+            for y, x, col in positions:
                 color = ACCENT_CYCLE[i % len(ACCENT_CYCLE)]
                 print(
-                    f"\033[{y + 1};{x + 1}H{color}{BRIGHT}{lines[y][x]}{RESET}",
+                    f"\033[{y + 1};{col + 1}H{color}{BRIGHT}{lines[y][x]}{RESET}",
                     end="",
                 )
             sys.stdout.flush()

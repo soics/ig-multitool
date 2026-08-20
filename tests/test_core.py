@@ -417,6 +417,31 @@ class BannerTests(unittest.TestCase):
                 self.fail("font candidates must render")
             self.assertTrue(lines[-1].strip(), "last line must not be blank")
 
+    def test_shimmer_positions_index_source_not_cursor(self):
+        from banner import _shimmer_positions
+
+        lines = ["## a", " b#"]
+        positions = _shimmer_positions(lines, 10)
+        self.assertTrue(positions)
+        for y, x, col in positions:
+            self.assertLess(x, len(lines[y]), "source index must stay in bounds")
+            self.assertEqual(col, x + (10 - len(lines[y])) // 2, "cursor col = x + pad")
+            self.assertLess(col, 10)
+
+    def test_double_width_keeps_dense_glyphs(self):
+        from banner import _double_width
+
+        self.assertEqual(_double_width(["#a", " b"]), ["##aa", "  bb"])
+
+    def test_wide_terminal_gets_doubled_art(self):
+        if not banner.HAS_DEPS:
+            self.skipTest("pyfiglet not installed")
+        lines = banner._lines_for(160)
+        wide = max(len(l) for l in lines)
+        self.assertLessEqual(wide, 160)
+        self.assertGreater(wide, 43, "wide terminals must get scaled-up art")
+        self.assertTrue(any(c in banner.DENSE_CHARS for l in lines for c in l))
+
 
 if __name__ == "__main__":
     unittest.main()
