@@ -1,0 +1,204 @@
+"""Shared helpers: pacing, confirmation, progress tracking, session login.
+
+All bulk actions sleep a random delay between actions (configurable via
+pacing in config.json) and pause briefly after every batch so the
+account doesn't look automated. Ctrl+C anywhere aborts cleanly and
+prints how far the run got.
+"""
+
+import random
+import sys
+import time
+from datetime import datetime, timedelta
+from typing import Any
+
+from colorama import Fore, Style
+
+Config = dict[str, Any]
+
+DONE = Fore.GREEN
+WARN = Fore.YELLOW
+ERR = Fore.RED
+DIM = Style.DIM
+RESET = Style.RESET_ALL
+
+
+class AbortedError(Exception):
+    """Raised when the user presses Ctrl+C mid-run."""
+
+
+class Progress:
+    def __init__(self, total: int, done_file: str = ""):
+        self.total = total
+        self.done = 0
+        self.skipped = 0
+        self.failed = 0
+        self.done_file = done_file
+        self._started = datetime.now()
+
+    @property
+    def elapsed(self) -> str:
+        delta = datetime.now() - self._started
+        return str(delta).split(".")[0]
+
+    def tick(self, ok: bool = True, skipped: bool = False) -> None:
+        if skipped:
+            self.skipped += 1
+        elif ok:
+            self.done += 1
+        else:
+            self.failed += 1
+
+    def status_line(self, target: str, current: str = "") -> str:
+        part = f" {current}" if current else ""
+        return (
+            f"{DIM}[{self.elapsed}]{RESET} {target}{part}: "
+            f"{self.done} done, {self.skipped} skipped, {self.failed} failed "
+            f"({self.total} total)"
+        )
+
+    def line_done(self, handle: str, name: str = "") -> None:
+        if name:
+            print(f"  {DONE}done{RESET} {handle} ({name})")
+        else:
+            print(f"  {DONE}done{RESET} {handle}")
+
+
+def human_count(n: int) -> str:
+    return f"{n} {Fore.CYAN}{'account' if n == 1 else 'accounts'}{RESET}"
+
+
+def confirm(question: str, default_no: bool = False) -> bool:
+    hint = "y/N" if default_no else "Y/n"
+    while True:
+        try:
+            answer = input(f"{WARN}{question} [{hint}]{RESET} ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            raise AbortedError("cancelled by user")
+        if not answer:
+            return not default_no
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print(f"{ERR}Please answer y or n.{RESET}")
+
+
+def pick_number(prompt: str, minimum: int = 1, maximum: int | None = None) -> int:
+    while True:
+        try:
+            raw = input(f"{WARN}{prompt}{RESET} ").strip()
+            value = int(raw)
+        except (EOFError, KeyboardInterrupt):
+            print()
+            raise AbortedError("cancelled by user")
+        except ValueError:
+            print(f"{ERR}Enter a number.{RESET}")
+            continue
+        if value < minimum or (maximum is not None and value > maximum):
+            print(f"{ERR}Enter a number between {minimum} and {maximum}.{RESET}")
+            continue
+        return value
+
+
+def sleep_between_actions(cfg: Config) -> None:
+    pacing = cfg.get("pacing", {})
+    low = float(pacing.get("action_delay_min", 3))
+    high = float(pacing.get("action_delay_max", 15))
+    if high < low:
+        low, high = high, low
+    delay = random.uniform(low, high)
+    try:
+        time.sleep(delay)
+    except KeyboardInterrupt:
+        raise AbortedError("cancelled during delay")
+
+
+def maybe_batch_pause(cfg: Config, done: int) -> None:
+    pacing = cfg.get("pacing", {})
+    every = int(pacing.get("batch_pause_every", 10))
+    seconds = int(pacing.get("batch_pause_seconds", 60))
+    if every <= 0 or seconds <= 0:
+        return
+    if done > 0 and done % every == 0:
+        print(f"{DIM}pausing {seconds}s after {done} actions (batch pause)...{RESET}")
+        try:
+            time.sleep(seconds)
+        except KeyboardInterrupt:
+            raise AbortedError("cancelled during batch pause")
+
+
+def read_done_file(path: str) -> set[str]:
+    if not path:
+        return set()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return {line.strip() for line in fh if line.strip()}
+    except FileNotFoundError:
+        return set()
+
+
+def append_done(path: str, handle: str) -> None:
+    if not path:
+        return
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(handle + "\n")
+
+
+def login(client_factory, cfg: Config):
+    """Login with session reuse. Returns an instagrapi client or None."""
+    session_path = cfg.get("session_path") or "session.json"
+    try:
+        if __import__("os").path.exists(session_path):
+            print("loading saved session...")
+            client = client_factory()
+            client.load_settings(session_path)
+            client.login(cfg.get("username") or "", cfg.get("password") or "")
+            return client
+    except Exception as exc:  # noqa: BLE001 - session may be stale
+        print(f"{DIM}session invalid ({exc}), logging in fresh...{RESET}")
+
+    username = cfg.get("username") or ""
+    password = cfg.get("password") or ""
+    if not username or not password:
+        username = input("Instagram username: ").strip()
+        password = input("Instagram password: ").strip()
+    print("logging in...")
+    client = client_factory()
+    client.login(username, password)
+    try:
+        client.dump_settings(session_path)
+        print(f"session saved to {session_path}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"{WARN}could not save session: {exc}{RESET}")
+    return client
+
+
+def install_keyboard_interrupt():
+    def handler(signum, frame):
+        raise AbortedError("interrupted")
+
+    try:
+        import signal
+
+        signal.signal(signal.SIGINT, handler)
+    except Exception:  # noqa: BLE001 - non-main thread
+        pass
+
+
+def run_interruptible(fn):
+    """Wrap a generator-consuming loop: any KeyboardInterrupt/AbortedError
+    becomes a clean stop with a final status line."""
+    return fn()
+
+
+def printable(handle_or_user) -> str:
+    try:
+        return getattr(handle_or_user, "username", None) or str(handle_or_user)
+    except Exception:  # noqa: BLE001
+        return str(handle_or_user)
+
+
+def fmt_error(exc) -> str:
+    return f"{type(exc).__name__}: {exc}"

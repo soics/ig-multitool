@@ -1,0 +1,20 @@
+{
+  "username": "your_instagram_username",
+  "password": "your_instagram_password",
+  "session_path": "session.json",
+  "pacing": {
+    "action_delay_min": 3,
+    "action_delay_max": 15,
+    "batch_pause_every": 10,
+    "batch_pause_seconds": 60
+  },
+  "ai": {
+    "enabled": false,
+    "base_url": "http://localhost:20128/v1",
+    "api_key": "your_ai_gateway_api_key",
+    "model": "ollama/gpt-oss:120b",
+    "system_prompt": "You are a helpful Instagram assistant. Answer concisely."
+  },
+  "whitelist": [],
+  "ask_on_start": false
+}

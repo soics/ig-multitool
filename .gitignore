@@ -1,0 +1,21 @@
+# secrets - never commit
+config.json
+.env
+
+# instagrapi session - never commit
+session.json
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# local progress trackers
+*-done.txt
+
+# venv
+.venv/
+
+# misc
+.DS_Store
