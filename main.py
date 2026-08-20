@@ -14,6 +14,7 @@ import sys
 import banner
 import config as config_mod
 import ui
+from actions import AbortedError
 from ui import DIM, RED, RESET, YELLOW
 
 try:
@@ -120,6 +121,8 @@ def main():
             else:
                 print(f"{RED}unknown option: {choice}{RESET}")
     except KeyboardInterrupt:
+        print(f"\n{YELLOW}interrupted.{RESET}")
+    except AbortedError:
         print(f"\n{YELLOW}interrupted.{RESET}")
 
 

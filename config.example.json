@@ -17,6 +17,5 @@
     "poll_interval_seconds": 20,
     "system_prompt": "You are a helpful Instagram assistant. Answer concisely."
   },
-  "whitelist": [],
-  "ask_on_start": false
+  "whitelist": []
 }

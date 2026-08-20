@@ -17,6 +17,7 @@ from actions import (
     append_done,
     confirm,
     maybe_batch_pause,
+    pick_number,
     read_done_file,
     sleep_between_actions,
     Config,
@@ -66,18 +67,15 @@ def run(client, cfg: Config) -> None:
     print("    2) multiple groups (numbers, comma separated)")
     choice = prompt("choose", "1").strip()
     if choice == "2":
-        raw = prompt("numbers")
-        try:
-            indices = [int(x) for x in raw.replace(",", " ").split()]
-        except ValueError:
-            print(f"{ERR}invalid numbers.{RESET}")
-            return
+        while True:
+            raw = prompt("numbers")
+            try:
+                indices = [int(x) for x in raw.replace(",", " ").split()]
+                break
+            except ValueError:
+                print(f"{ERR}Enter numbers separated by commas or spaces.{RESET}")
     else:
-        try:
-            n = int(prompt("group number").strip())
-        except ValueError:
-            print(f"{ERR}invalid number.{RESET}")
-            return
+        n = pick_number("group number", 1, len(groups))
         indices = [n]
 
     targets = [groups[i - 1] for i in indices if 1 <= i <= len(groups)]

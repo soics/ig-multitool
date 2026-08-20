@@ -17,7 +17,8 @@ import json
 import time
 import urllib.request
 
-from actions import RESET, Config
+import config
+from actions import RESET, Config, WARN
 from ui import CYAN, DIM, GREEN, RED, box, header, prompt
 
 WHITELISTED = "whitelisted"
@@ -98,7 +99,18 @@ def ai_reply(cfg: Config, prompt_text: str) -> str | None:
         return None
 
 
-def _whitelist_menu(cfg: Config) -> None:
+def _save_whitelist(cfg: Config, persist: bool) -> None:
+    if not persist:
+        print(f"{DIM}preview: not writing config.json{RESET}")
+        return
+    try:
+        config.save_config(cfg)
+        print(f"{DIM}whitelist saved to config.json{RESET}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"{WARN}could not save config.json: {exc}{RESET}")
+
+
+def _whitelist_menu(cfg: Config, persist: bool = True) -> None:
     while True:
         wl = cfg.get("whitelist", [])
         box(
@@ -112,18 +124,23 @@ def _whitelist_menu(cfg: Config) -> None:
             ],
         )
         choice = prompt("choose", "3").strip()
+        changed = False
         if choice == "1":
             name = prompt("username").lstrip("@")
             if name and name not in wl:
                 cfg.setdefault("whitelist", []).append(name)
                 print(f"  {GREEN}added {name}{RESET}")
+                changed = True
         elif choice == "2":
             name = prompt("username").lstrip("@")
             if name in wl:
                 wl.remove(name)
                 print(f"  {GREEN}removed {name}{RESET}")
+                changed = True
         elif choice == "3":
             break
+        if changed:
+            _save_whitelist(cfg, persist)
 
 
 def _handle_thread(client, cfg: Config, thread, seen, last_replied, whitelist_only: bool) -> None:
@@ -201,6 +218,7 @@ def run(client, cfg: Config) -> None:
         if choice == "1":
             chat_loop(client, cfg)
         elif choice == "2":
-            _whitelist_menu(cfg)
+            persist = not bool(getattr(client, "is_fake", False))
+            _whitelist_menu(cfg, persist)
         elif choice == "3":
             return

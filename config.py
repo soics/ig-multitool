@@ -37,7 +37,6 @@ DEFAULTS = {
         ),
     },
     "whitelist": [],
-    "ask_on_start": False,
 }
 
 

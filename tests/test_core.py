@@ -8,6 +8,7 @@ Covers: config merging, actions pacing/progress/login, the AI chat loop
 against FakeClient, and the non-mutual / group detection filters.
 """
 
+import json
 import sys
 import tempfile
 import unittest
@@ -75,17 +76,6 @@ class ActionsTests(unittest.TestCase):
         plain = lambda n: re.sub(r"\x1b\[[0-9;]*m", "", actions.human_count(n))
         self.assertIn("1 account", plain(1))
         self.assertIn("3 accounts", plain(3))
-
-    def test_progress_tracking(self):
-        prog = actions.Progress(total=5)
-        prog.tick()
-        prog.tick(ok=False)
-        prog.tick(skipped=True)
-        line = prog.status_line("unfollow")
-        self.assertIn("1 done", line)
-        self.assertIn("1 skipped", line)
-        self.assertIn("1 failed", line)
-        self.assertIn("(5 total)", line)
 
     def test_sleep_between_actions(self):
         with patch("actions.time.sleep") as sleep, patch(
@@ -281,6 +271,68 @@ class AiChatTests(unittest.TestCase):
         client = InterruptSend()
         with patch("ai_chat.time.sleep", side_effect=KeyboardInterrupt):
             ai_chat.chat_loop(client, _cfg())
+
+
+    def test_whitelist_menu_persists_to_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = {"whitelist": []}
+            target = Path(tmp) / "config.json"
+            with patch("config.CONFIG_PATH", target), patch(
+                "ai_chat.prompt", side_effect=["1", "alexnova", "3"]
+            ):
+                ai_chat._whitelist_menu(cfg, persist=True)
+            saved = json.loads(target.read_text(encoding="utf-8"))
+        self.assertIn("alexnova", cfg["whitelist"])
+        self.assertIn("alexnova", saved["whitelist"])
+
+    def test_whitelist_menu_skips_write_in_preview(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = {"whitelist": []}
+            target = Path(tmp) / "config.json"
+            with patch("config.CONFIG_PATH", target), patch(
+                "ai_chat.prompt", side_effect=["1", "alexnova", "3"]
+            ):
+                ai_chat._whitelist_menu(cfg, persist=False)
+            self.assertFalse(target.exists())
+        self.assertIn("alexnova", cfg["whitelist"])
+
+    def test_whitelist_menu_remove_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = {"whitelist": ["alexnova", "brianna_k"]}
+            target = Path(tmp) / "config.json"
+            with patch("config.CONFIG_PATH", target), patch(
+                "ai_chat.prompt", side_effect=["2", "alexnova", "3"]
+            ):
+                ai_chat._whitelist_menu(cfg, persist=True)
+            saved = json.loads(target.read_text(encoding="utf-8"))
+        self.assertEqual(cfg["whitelist"], ["brianna_k"])
+        self.assertEqual(saved["whitelist"], ["brianna_k"])
+
+    def test_aborted_error_returns_to_menu_not_traceback(self):
+        import main as main_mod
+
+        with patch("main.show_banner"), patch(
+            "main.config_mod.load_config", return_value={"session_path": "/tmp/x.json"}
+        ), patch("main.config_mod.first_run", return_value=False), patch(
+            "main.ensure_deps", return_value=True
+        ), patch("main.client_factory", return_value=object()), patch(
+            "actions.login", return_value=object()
+        ), patch(
+            "main.main_menu", side_effect=actions.AbortedError("cancelled")
+        ):
+            main_mod.main()
+
+    def test_main_catches_keyboard_interrupt_at_menu(self):
+        import main as main_mod
+
+        with patch("main.show_banner"), patch(
+            "main.config_mod.load_config", return_value={"session_path": "/tmp/x.json"}
+        ), patch("main.config_mod.first_run", return_value=False), patch(
+            "main.ensure_deps", return_value=True
+        ), patch("main.client_factory", return_value=object()), patch(
+            "actions.login", return_value=object()
+        ), patch("main.main_menu", side_effect=KeyboardInterrupt):
+            main_mod.main()
 
 
 class ToolTests(unittest.TestCase):

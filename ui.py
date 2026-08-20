@@ -76,12 +76,41 @@ def unicode_ok() -> bool:
     return "utf" in enc or "cp65001" in enc
 
 
+def _enable_windows_vt() -> bool:
+    """Enable ANSI VT processing on the Windows console (Win10+).
+
+    Returns True only when raw cursor-escape sequences will actually be
+    interpreted. On legacy consoles (or when the call fails) the caller
+    must not emit them - colorama only converts color codes, not cursor
+    movement.
+    """
+    if sys.platform != "win32":
+        return True
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        if not (mode.value & ENABLE_VIRTUAL_TERMINAL_PROCESSING):
+            if not kernel32.SetConsoleMode(
+                handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            ):
+                return False
+        return True
+    except Exception:  # noqa: BLE001 - non-Windows or restricted env
+        return False
+
+
 def supports_cursor() -> bool:
     if not HAS_COLOR:
         return False
-    if sys.platform == "win32":
-        return True
-    return sys.stdout.isatty()
+    if not sys.stdout.isatty():
+        return False
+    return _enable_windows_vt()
 
 
 def _terminal_width() -> int:

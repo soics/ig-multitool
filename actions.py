@@ -9,14 +9,12 @@ prints how far the run got.
 import os
 import random
 import time
-from datetime import datetime
 from typing import Any
 
 from colorama import Fore, Style
 
 Config = dict[str, Any]
 
-DONE = Fore.GREEN
 WARN = Fore.YELLOW
 ERR = Fore.RED
 DIM = Style.DIM
@@ -25,43 +23,6 @@ RESET = Style.RESET_ALL
 
 class AbortedError(Exception):
     """Raised when the user presses Ctrl+C mid-run."""
-
-
-class Progress:
-    def __init__(self, total: int, done_file: str = ""):
-        self.total = total
-        self.done = 0
-        self.skipped = 0
-        self.failed = 0
-        self.done_file = done_file
-        self._started = datetime.now()
-
-    @property
-    def elapsed(self) -> str:
-        delta = datetime.now() - self._started
-        return str(delta).split(".")[0]
-
-    def tick(self, ok: bool = True, skipped: bool = False) -> None:
-        if skipped:
-            self.skipped += 1
-        elif ok:
-            self.done += 1
-        else:
-            self.failed += 1
-
-    def status_line(self, target: str, current: str = "") -> str:
-        part = f" {current}" if current else ""
-        return (
-            f"{DIM}[{self.elapsed}]{RESET} {target}{part}: "
-            f"{self.done} done, {self.skipped} skipped, {self.failed} failed "
-            f"({self.total} total)"
-        )
-
-    def line_done(self, handle: str, name: str = "") -> None:
-        if name:
-            print(f"  {DONE}done{RESET} {handle} ({name})")
-        else:
-            print(f"  {DONE}done{RESET} {handle}")
 
 
 def human_count(n: int) -> str:
@@ -178,7 +139,3 @@ def login(client_factory, cfg: Config):
     except Exception as exc:  # noqa: BLE001
         print(f"{WARN}could not save session: {exc}{RESET}")
     return client
-
-
-def fmt_error(exc) -> str:
-    return f"{type(exc).__name__}: {exc}"

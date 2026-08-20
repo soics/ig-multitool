@@ -15,7 +15,7 @@ Works on **Linux, macOS, and Windows** (Python 3.10+).
 
 | tool | what it does |
 | --- | --- |
-| **AI chat** | automatic DM reply loop against any OpenAI-compatible `/v1/chat/completions` endpoint (local gateways like 9Router work great). Optional whitelist: only whitelisted users' DMs get replied to. |
+| **AI chat** | automatic DM reply loop against any OpenAI-compatible `/v1/chat/completions` endpoint (local gateways like 9Router work great). Optional whitelist (`ai.whitelist_only`): only whitelisted users' DMs get replied to. Falls back to a canned "I'll get back to you shortly" reply when the AI is disabled or unreachable. |
 | **Mass unfollow** | unfollow everyone, skip mutuals, a selected list, or a plain count. |
 | **Remove followers** | remove by amount, all, or non-mutuals (follower removal, not blocking). |
 | **Leave group chat** | pick one or several group threads and leave them. |
@@ -96,6 +96,9 @@ Edit `config.json` and fill in your Instagram credentials.
 
 `config.json` and `session.json` are gitignored - never commit them.
 Only `config.example.json` is public.
+
+Adding or removing users in the AI chat whitelist menu writes the change
+back to `config.json` (skipped in `--preview`).
 
 ## Usage
 
