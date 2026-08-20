@@ -28,6 +28,8 @@ DEFAULTS = {
         "base_url": "http://localhost:20128/v1",
         "api_key": "",
         "model": "ollama/gpt-oss:120b",
+        "whitelist_only": False,
+        "poll_interval_seconds": 20,
         "system_prompt": (
             "You are a helpful Instagram assistant. Answer concisely. "
             "You may answer questions about the account owner's posts, "

@@ -89,6 +89,8 @@ Edit `config.json` and fill in your Instagram credentials.
 | `pacing.batch_pause_every/seconds` | pause after every N actions (default 60s per 10) |
 | `ai.enabled` | on/off for the AI chat tool |
 | `ai.base_url` / `ai.api_key` / `ai.model` | OpenAI-compatible endpoint (e.g. `http://localhost:20128/v1`, `ollama/gpt-oss:120b`) |
+| `ai.whitelist_only` | only reply to users in `whitelist` (default `false` = reply to everyone) |
+| `ai.poll_interval_seconds` | seconds between DM polls in chat mode (default 20) |
 | `ai.system_prompt` | persona for the AI replies |
 | `whitelist` | usernames allowed in whitelist-only chat mode |
 

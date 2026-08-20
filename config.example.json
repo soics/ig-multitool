@@ -13,6 +13,8 @@
     "base_url": "http://localhost:20128/v1",
     "api_key": "your_ai_gateway_api_key",
     "model": "ollama/gpt-oss:120b",
+    "whitelist_only": false,
+    "poll_interval_seconds": 20,
     "system_prompt": "You are a helpful Instagram assistant. Answer concisely."
   },
   "whitelist": [],

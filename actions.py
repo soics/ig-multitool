@@ -6,6 +6,7 @@ account doesn't look automated. Ctrl+C anywhere aborts cleanly and
 prints how far the run got.
 """
 
+import os
 import random
 import time
 from datetime import datetime
@@ -146,17 +147,22 @@ def append_done(path: str, handle: str) -> None:
 
 
 def login(client_factory, cfg: Config):
-    """Login with session reuse. Returns an instagrapi client or None."""
+    """Login with session reuse. Returns an instagrapi client or None.
+
+    A saved session is loaded and verified with a lightweight
+    account_info() call; a full username/password login only happens
+    when there is no session or the session is rejected.
+    """
     session_path = cfg.get("session_path") or "session.json"
-    try:
-        if __import__("os").path.exists(session_path):
-            print("loading saved session...")
-            client = client_factory()
+    if os.path.exists(session_path):
+        print("loading saved session...")
+        client = client_factory()
+        try:
             client.load_settings(session_path)
-            client.login(cfg.get("username") or "", cfg.get("password") or "")
+            client.account_info()
             return client
-    except Exception as exc:  # noqa: BLE001 - session may be stale
-        print(f"{DIM}session invalid ({exc}), logging in fresh...{RESET}")
+        except Exception as exc:  # noqa: BLE001 - session may be stale
+            print(f"{DIM}session invalid ({exc}), logging in fresh...{RESET}")
 
     username = cfg.get("username") or ""
     password = cfg.get("password") or ""
@@ -172,31 +178,6 @@ def login(client_factory, cfg: Config):
     except Exception as exc:  # noqa: BLE001
         print(f"{WARN}could not save session: {exc}{RESET}")
     return client
-
-
-def install_keyboard_interrupt():
-    def handler(signum, frame):
-        raise AbortedError("interrupted")
-
-    try:
-        import signal
-
-        signal.signal(signal.SIGINT, handler)
-    except Exception:  # noqa: BLE001 - non-main thread
-        pass
-
-
-def run_interruptible(fn):
-    """Wrap a generator-consuming loop: any KeyboardInterrupt/AbortedError
-    becomes a clean stop with a final status line."""
-    return fn()
-
-
-def printable(handle_or_user) -> str:
-    try:
-        return getattr(handle_or_user, "username", None) or str(handle_or_user)
-    except Exception:  # noqa: BLE001
-        return str(handle_or_user)
 
 
 def fmt_error(exc) -> str:

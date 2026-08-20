@@ -55,8 +55,8 @@ def run(client, cfg: Config) -> None:
     followers = list(followers.values())
     if mode == MODE_NON_MUTUAL:
         following = client.user_following(client.user_id)
-        following_ids = set(following.keys())
-        targets = [u for u in followers if u.pk not in following_ids]
+        following_ids = {str(k) for k in following.keys()}
+        targets = [u for u in followers if str(u.pk) not in following_ids]
     elif mode == MODE_AMOUNT:
         targets = followers[:amount]
     else:

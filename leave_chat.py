@@ -33,7 +33,10 @@ def _list_groups(client):
     try:
         for thread in client.direct_threads(amount=100):
             users = getattr(thread, "users", [])
-            if len(users) >= 2:
+            is_group = getattr(thread, "is_group", None)
+            if is_group is None:
+                is_group = len(users) >= 2
+            if is_group:
                 threads.append(thread)
     except Exception as exc:  # noqa: BLE001
         print(f"{ERR}cannot list threads: {exc}{RESET}")

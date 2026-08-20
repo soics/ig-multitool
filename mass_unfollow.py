@@ -42,7 +42,7 @@ def _choose_mode():
     print(f"    1) {MODE_ALL}          - everyone you follow")
     print(f"    2) {MODE_NON_MUTUAL}  - skip people who follow you back")
     print(f"    3) {MODE_SELECTED}     - a specific list (comma separated usernames)")
-    print(f"    4) {MODE_COUNT}        - just N accounts, newest first")
+    print(f"    4) {MODE_COUNT}        - just N accounts")
     choice = prompt("choose", "1").strip()
     return {"1": MODE_ALL, "2": MODE_NON_MUTUAL, "3": MODE_SELECTED, "4": MODE_COUNT}.get(choice, MODE_ALL)
 
@@ -67,11 +67,14 @@ def run(client, cfg: Config) -> None:
     following = list(following.values())
     if mode == MODE_NON_MUTUAL:
         followers = client.user_followers(client.user_id)
-        follower_ids = set(followers.keys())
-        targets = [u for u in following if u.pk not in follower_ids]
+        follower_ids = {str(k) for k in followers.keys()}
+        targets = [u for u in following if str(u.pk) not in follower_ids]
     elif mode == MODE_SELECTED:
         wanted = set(selected or [])
         targets = [u for u in following if u.username in wanted]
+        missing = wanted - {u.username for u in targets}
+        if missing:
+            print(f"{WARN}not found in following: {', '.join(sorted(missing))}{RESET}")
     elif mode == MODE_COUNT:
         targets = following[:count]
     else:
