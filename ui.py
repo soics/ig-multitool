@@ -20,6 +20,30 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 def _visible_len(text: str) -> int:
     return len(_ANSI_RE.sub("", text))
 
+
+def _clip(text: str, limit: int) -> str:
+    """Cut `text` to `limit` visible characters, keeping ANSI codes intact."""
+    if _visible_len(text) <= limit:
+        return text
+    parts = re.split(r"(\x1b\[[0-9;]*m)", text)
+    out: list[str] = []
+    visible = 0
+    for part in parts:
+        if part.startswith("\x1b["):
+            out.append(part)
+            continue
+        room = limit - 1 - visible
+        if room <= 0:
+            break
+        if len(part) > room:
+            out.append(part[:room])
+            visible += room
+            break
+        out.append(part)
+        visible += len(part)
+    out.append("…")
+    return "".join(out)
+
 try:
     import colorama
 
@@ -158,13 +182,16 @@ def box(title: str, lines: list[str]) -> None:
     tl, tr, bl, br = ("┌", "┐", "└", "┘") if unicode_ else ("+", "+", "+", "+")
     hz, vt = ("─", "│") if unicode_ else ("-", "|")
     max_visible = max(_visible_len(l) for l in lines) if lines else 0
-    min_width = min(60, _terminal_width() - 2)
-    width = min(max(max_visible + 4, _visible_len(title) + 4, min_width), _terminal_width() - 2)
-    top = f"{DIM}{tl}{hz}{RESET} {BRIGHT}{title}{RESET} {DIM}{hz * (width - _visible_len(title) - 3)}{tr}{RESET}"
+    width = max(min(60, _terminal_width() - 2), 4)
+    width = min(width, max(max_visible + 4, _visible_len(title) + 4))
+    title_clip = _clip(title, max(width - 1, 1))
+    fill = max(width - 1 - _visible_len(title_clip), 0)
+    top = f"{DIM}{tl}{hz}{RESET} {BRIGHT}{title_clip}{RESET} {DIM}{hz * fill}{tr}{RESET}"
     print(top)
     for line in lines:
-        pad = max(width - _visible_len(line), 0)
-        print(f"{DIM}{vt}{RESET} {line}{' ' * pad} {DIM}{vt}{RESET}")
+        line_clip = _clip(line, width)
+        pad = width - _visible_len(line_clip)
+        print(f"{DIM}{vt}{RESET} {line_clip}{' ' * pad} {DIM}{vt}{RESET}")
     print(f"{DIM}{bl}{hz * (width + 2)}{br}{RESET}")
 
 

@@ -355,5 +355,34 @@ class ToolTests(unittest.TestCase):
         self.assertTrue(FakeClient().is_fake)
 
 
+class UiTests(unittest.TestCase):
+    def test_clip_keeps_ansi_codes_intact(self):
+        from ui import _clip
+
+        text = "ab\x1b[31mcd\x1b[0m ef"
+        self.assertEqual(_clip(text, 4), "ab\x1b[31mc…")
+        self.assertEqual(len(_clip(text, 4).replace("\x1b[31m", "").replace("\x1b[0m", "")), 4)
+
+    def test_clip_noop_when_short_enough(self):
+        from ui import _clip
+
+        self.assertEqual(_clip("hello", 10), "hello")
+        self.assertEqual(_clip("", 0), "")
+
+    def test_box_aligns_and_clips_at_narrow_width(self):
+        import contextlib
+        import io
+        from ui import _clip, _visible_len, box
+
+        with patch("ui._terminal_width", return_value=12):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                box("test menu", ["1  some long option label here", "2  back"])
+        lines = [l for l in buf.getvalue().splitlines() if l]
+        widths = {_visible_len(l) for l in lines}
+        self.assertEqual(widths, {14}, f"all box rows must share one width, got {widths}")
+        self.assertTrue(any("…" in l for l in lines), "long lines must be clipped")
+
+
 if __name__ == "__main__":
     unittest.main()
